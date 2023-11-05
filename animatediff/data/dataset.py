@@ -16,7 +16,7 @@ from torchvision.io import read_image
 class WebVid10M(Dataset):
     def __init__(
             self,
-            csv_path, video_folder,
+            csv_path, video_folder,motion_folder,
             sample_size=256, sample_stride=4, sample_n_frames=16,
             is_image=False,
         ):
@@ -28,6 +28,7 @@ class WebVid10M(Dataset):
         random.shuffle(self.dataset)    
         self.video_folder    = video_folder
         self.sample_stride   = sample_stride
+        self.motion_folder = motion_folder
         self.sample_n_frames = sample_n_frames
         self.is_image        = is_image
         print("length",len(self.dataset))
@@ -114,20 +115,31 @@ class WebVid10M(Dataset):
             
             return pixel_values, name
             
+    def read_motion_score(preprocessed_dir, videoid):
+        score_file = os.path.join(preprocessed_dir, f"{videoid}.txt")
+        if not os.path.exists(score_file):
+            return None
+        with open(score_file, 'r') as file:
+            return float(file.read().strip())
+          
+            
+            
     def get_batch(self, idx):
         def sort_frames(frame_name):
-            # Extract the frame number and convert it to an integer
             return int(frame_name.split('_')[1].split('.')[0])
-    
+
         while True:
             video_dict = self.dataset[idx]
             videoid, name, page_dir = video_dict['videoid'], video_dict['name'], video_dict['page_dir']
-    
-            # Directory where preprocessed images for the video are stored
+
             preprocessed_dir = os.path.join(self.video_folder, videoid)
-    
-            # Check if the directory exists
+
             if not os.path.exists(preprocessed_dir):
+                idx = random.randint(0, len(self.dataset) - 1)
+                continue  # try the next index
+
+            motion_score = read_motion_score(self.motion_folder, videoid)
+            if motion_score is None:
                 idx = random.randint(0, len(self.dataset) - 1)
                 continue  # try the next index
     
@@ -148,8 +160,9 @@ class WebVid10M(Dataset):
             if self.is_image:
                 pixel_values = pixel_values[0]
     
-            return pixel_values, name
-
+        return pixel_values, name, motion_score
+        
+        
     
     def __len__(self):
         return self.length
@@ -157,16 +170,15 @@ class WebVid10M(Dataset):
     def __getitem__(self, idx):
         while True:
             try:
-                pixel_values, name = self.get_batch(idx)
+                pixel_values, name, motion_score = self.get_batch(idx)
                 break
-
             except Exception as e:
-                print (e)
-                idx = random.randint(0, self.length-1)
+                print(e)
+                idx = random.randint(0, self.length - 1)
 
-        pixel_values = self.pixel_transforms(pixel_values)
-        sample = dict(pixel_values=pixel_values, text=name)
-        return sample
+    pixel_values = self.pixel_transforms(pixel_values)
+    sample = dict(pixel_values=pixel_values, text=name, motion_score=motion_score)
+
 
 
 

@@ -95,7 +95,7 @@ class TemporalTransformer3DModel(nn.Module):
         attention_block_types              = ( "Temporal_Self", "Temporal_Self", ),        
         dropout                            = 0.0,
         norm_num_groups                    = 32,
-        cross_attention_dim                = 1024,
+        cross_attention_dim                = 768,
         activation_fn                      = "geglu",
         attention_bias                     = False,
         upcast_attention                   = False,

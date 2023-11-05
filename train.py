@@ -371,7 +371,11 @@ def main(
                     batch['text'], max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt"
                 ).input_ids.to(latents.device)
                 encoder_hidden_states = text_encoder(prompt_ids)[0]
-                
+            
+
+            motion = batch['motion_score']
+            encoded_float = float_input.unsqueeze(1).expand_as(encoder_hidden_states)
+
             # Get the target for loss depending on the prediction type
             if noise_scheduler.config.prediction_type == "epsilon":
                 target = noise
@@ -383,7 +387,7 @@ def main(
             # Predict the noise residual and compute loss
             # Mixed-precision training
             with torch.cuda.amp.autocast(enabled=mixed_precision_training):
-                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states,encoded_float).sample
                 loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
             optimizer.zero_grad()

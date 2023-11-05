@@ -29,8 +29,9 @@ noise_scheduler_kwargs:
   clip_sample:         false
 
 train_data:
-  csv_path:        "/workspace/videos/tosend/output_august_sample.csv"
-  video_folder:    "/workspace/videos/tosend/download_videos2_cutdown_small"
+  csv_path:        "/data/webvid/webvid/results_2M_train.csv"
+  video_folder:    "/data/webvid/webvid/preprocessed_videos"
+  motion_folder:   "/data/webvid/webvid/preprocessed_scale_values"
   sample_size:     256
   sample_stride:   4
   sample_n_frames: 16
