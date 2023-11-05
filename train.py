@@ -174,6 +174,13 @@ def main(
     else:
         unet = UNet2DConditionModel.from_pretrained(pretrained_model_path, subfolder="unet")
         
+        
+        
+    override_checkpoint = torch.load(pretrained_override_path, map_location="cpu")    
+    override_state_dict = override_checkpoint
+    missing_after_load, unexpected = unet.load_state_dict(override_state_dict, strict=False)
+    print(f"override missing keys after loading override checkpoint: {len(missing_after_load)}, unexpected keys: {len(unexpected)}")
+    
     # Load pretrained unet weights
     if unet_checkpoint_path != "":
         zero_rank_print(f"from checkpoint: {unet_checkpoint_path}")
@@ -408,17 +415,11 @@ def main(
                 wandb.log({"train_loss": loss.item()}, step=global_step)
                 
             # Save checkpoint
-            if is_main_process and (global_step % checkpointing_steps == 0 or step == len(train_dataloader) - 1):
+            if is_main_process and (global_step % checkpointing_steps == 0):
                 save_path = os.path.join(output_dir, f"checkpoints")
-                state_dict = {
-                    "epoch": epoch,
-                    "global_step": global_step,
-                    "state_dict": unet.state_dict(),
-                }
-                if step == len(train_dataloader) - 1:
-                    torch.save(state_dict, os.path.join(save_path, f"checkpoint-epoch-{epoch+1}.ckpt"))
-                else:
-                    torch.save(state_dict, os.path.join(save_path, f"checkpoint.ckpt"))
+                save_path = os.path.join(save_path, f"checkpoint-epoch-{global_step}.ckpt")
+                save_checkpoint(unet,optimizer,trainable_params,save_path)
+
                 logging.info(f"Saved state to {save_path} (global_step: {global_step})")
                 
             # Periodically validation
@@ -478,7 +479,21 @@ def main(
             
     dist.destroy_process_group()
 
-
+def save_checkpoint(unet, optimizer, trainable_params, mm_path, epoch=None, global_step=None):
+    # Convert the list of trainable parameters to a set for faster lookup
+    trainable_params_set = set(id(p) for p in trainable_params)
+    
+    # Extract the current state of the UNet model
+    state_dict = unet.state_dict()
+    
+    checkpoint = {
+        'state_dict': state_dict, 
+        'optimizer_state_dict': optimizer.state_dict(),
+        'epoch': epoch,
+        'global_step': global_step
+    }
+    
+    torch.save(checkpoint, mm_path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -95,7 +95,7 @@ class TemporalTransformer3DModel(nn.Module):
         attention_block_types              = ( "Temporal_Self", "Temporal_Self", ),        
         dropout                            = 0.0,
         norm_num_groups                    = 32,
-        cross_attention_dim                = 768,
+        cross_attention_dim                = 1024,
         activation_fn                      = "geglu",
         attention_bias                     = False,
         upcast_attention                   = False,
@@ -183,6 +183,7 @@ class TemporalTransformerBlock(nn.Module):
         norms = []
         
         for block_name in attention_block_types:
+           # print("initialising bock: ", block_name)
             attention_blocks.append(
                 VersatileAttention(
                     attention_mode=block_name.split("_")[0],
@@ -210,6 +211,7 @@ class TemporalTransformerBlock(nn.Module):
 
 
     def forward(self, hidden_states, encoder_hidden_states=None, attention_mask=None, video_length=None):
+        
         for attention_block, norm in zip(self.attention_blocks, self.norms):
             norm_hidden_states = norm(hidden_states)
             hidden_states = attention_block(
@@ -255,11 +257,11 @@ class VersatileAttention(CrossAttention):
             *args, **kwargs
         ):
         super().__init__(*args, **kwargs)
-        assert attention_mode == "Temporal"
+        #assert attention_mode == "Temporal"
 
         self.attention_mode = attention_mode
         self.is_cross_attention = kwargs["cross_attention_dim"] is not None
-        
+        print("running attention mode ", attention_mode ,"cross attention" ,self.is_cross_attention)
         self.pos_encoder = PositionalEncoding(
             kwargs["query_dim"],
             dropout=0., 
@@ -268,6 +270,7 @@ class VersatileAttention(CrossAttention):
 
     def extra_repr(self):
         return f"(Module Info) Attention_Mode: {self.attention_mode}, Is_Cross_Attention: {self.is_cross_attention}"
+
 
     def forward(self, hidden_states, encoder_hidden_states=None, attention_mask=None, video_length=None):
         batch_size, sequence_length, _ = hidden_states.shape
@@ -278,13 +281,17 @@ class VersatileAttention(CrossAttention):
             
             if self.pos_encoder is not None:
                 hidden_states = self.pos_encoder(hidden_states)
-            
+          #  if encoder_hidden_states is not None:
+                #print(f"encoder hidden shapes  {encoder_hidden_states.shape}")
+
             encoder_hidden_states = repeat(encoder_hidden_states, "b n c -> (b d) n c", d=d) if encoder_hidden_states is not None else encoder_hidden_states
         else:
-            raise NotImplementedError
-
+            encoder_hidden_states = repeat(encoder_hidden_states, "b n c -> (b d) n c", d=video_length) if encoder_hidden_states is not None else encoder_hidden_states
+      
         encoder_hidden_states = encoder_hidden_states
-
+        #if (encoder_hidden_states is not None):
+        #    print("encoder shapes",encoder_hidden_states.shape)
+        #print("hidden shape",hidden_states.shape)
         if self.group_norm is not None:
             hidden_states = self.group_norm(hidden_states.transpose(1, 2)).transpose(1, 2)
 
@@ -296,6 +303,7 @@ class VersatileAttention(CrossAttention):
             raise NotImplementedError
 
         encoder_hidden_states = encoder_hidden_states if encoder_hidden_states is not None else hidden_states
+        
         key = self.to_k(encoder_hidden_states)
         value = self.to_v(encoder_hidden_states)
 
@@ -329,3 +337,5 @@ class VersatileAttention(CrossAttention):
             hidden_states = rearrange(hidden_states, "(b d) f c -> (b f) d c", d=d)
 
         return hidden_states
+
+
