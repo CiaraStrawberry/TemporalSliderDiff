@@ -384,7 +384,20 @@ class AnimationPipeline(DiffusionPipeline):
         # Prepare extra step kwargs.
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
         
-        motion_encoded = motion.unsqueeze(1).expand_as(text_embeddings)
+        motion = float(motion)
+        
+        # Create a tensor from the float value
+        motion_tensor = torch.tensor(motion, dtype=torch.float,device=device)
+        
+        # Reshape it to [1, 1, 1]
+        motion_tensor = motion_tensor.view(1, 1, 1)
+
+        print("encode with size",text_embeddings.shape)
+        
+        # Now expand it to match the shape [18, 77, 512]
+        expanded_motion_tensor = motion_tensor.expand(batch_size, 77, 512)
+
+        expanded_motion_tensor = torch.cat([expanded_motion_tensor, expanded_motion_tensor])
         
         # Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
@@ -395,7 +408,7 @@ class AnimationPipeline(DiffusionPipeline):
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
-                noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings,image_encoder_hidden_states=motion_encoded).sample.to(dtype=latents_dtype)
+                noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings,image_encoder_hidden_states=expanded_motion_tensor).sample.to(dtype=latents_dtype)
                 # noise_pred = []
                 # import pdb
                 # pdb.set_trace()

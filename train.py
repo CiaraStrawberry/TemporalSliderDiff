@@ -83,7 +83,7 @@ def main(
     
     output_dir: str,
     pretrained_model_path: str,
-    pretrained_override_path: str
+    pretrained_override_path: str,
     train_data: Dict,
     validation_data: Dict,
     cfg_random_null_text: bool = True,
@@ -183,15 +183,30 @@ def main(
     
     # Load pretrained unet weights
     if unet_checkpoint_path != "":
-        zero_rank_print(f"from checkpoint: {unet_checkpoint_path}")
-        unet_checkpoint_path = torch.load(unet_checkpoint_path, map_location="cpu")
-        if "global_step" in unet_checkpoint_path: zero_rank_print(f"global_step: {unet_checkpoint_path['global_step']}")
-        state_dict = unet_checkpoint_path["state_dict"] if "state_dict" in unet_checkpoint_path else unet_checkpoint_path
-
-        m, u = unet.load_state_dict(state_dict, strict=False)
-        zero_rank_print(f"missing keys: {len(m)}, unexpected keys: {len(u)}")
-        assert len(u) == 0
-        
+            checkpoint = torch.load(unet_checkpoint_path, map_location="cpu")
+    
+            if "global_step" in checkpoint:
+                zero_rank_print(f"global_step: {checkpoint['global_step']}")
+    
+            loaded_state_dict = checkpoint["state_dict"] if "state_dict" in checkpoint else checkpoint
+    
+            # Check for "module." prefix and remove
+            new_loaded_state_dict = {key.replace("module.", "") if key.startswith("module.") else key: value 
+                                    for key, value in loaded_state_dict.items()}
+    
+            current_model_dict = unet.state_dict()
+    
+            
+            loaded__checkpoint_params_names = set(loaded_state_dict.keys())
+    
+            
+            new_state_dict = {k: v if v.size() == current_model_dict[k].size() else current_model_dict[k]
+                            for k, v in zip(current_model_dict.keys(), new_loaded_state_dict.values())}
+    
+            missing_after_load, unexpected = unet.load_state_dict(new_state_dict, strict=False)
+            print(f"missing keys after loading checkpoint: {len(missing_after_load)}, unexpected keys: {len(unexpected)}")
+            assert len(unexpected) == 0
+            
     # Freeze vae and text_encoder
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
@@ -374,7 +389,15 @@ def main(
             
 
             motion = batch['motion_score']
-            encoded_float = float_input.unsqueeze(1).expand_as(encoder_hidden_states)
+
+            # Ensure motion is of shape [18, 1]
+            motion = motion.view(-1, 1)
+            
+            # Add an extra dimension to make it [18, 1, 1]
+            motion = motion.unsqueeze(-1)
+            
+            # Now expand it to match the shape [18, 77, 768]
+            expanded_motion_tensor = motion.expand(-1, 77, 512).to(torch.float)
 
             # Get the target for loss depending on the prediction type
             if noise_scheduler.config.prediction_type == "epsilon":
@@ -387,7 +410,7 @@ def main(
             # Predict the noise residual and compute loss
             # Mixed-precision training
             with torch.cuda.amp.autocast(enabled=mixed_precision_training):
-                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states,encoded_float).sample
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states,expanded_motion_tensor).sample
                 loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
             optimizer.zero_grad()
@@ -436,10 +459,11 @@ def main(
                 height = train_data.sample_size[0] if not isinstance(train_data.sample_size, int) else train_data.sample_size
                 width  = train_data.sample_size[1] if not isinstance(train_data.sample_size, int) else train_data.sample_size
 
-                prompts = validation_data.prompts[:2] if global_step < 1000 and (not image_finetune) else validation_data.prompts
-                motion_values = [5,5,80,80]
+                prompts = validation_data.prompts
+                motion_values = [5.0,5.0,80.0,80.0]
 
-                for idx, (prompt, motion) in enumerate(zip(prompts, motion_values)):
+                for idx, (prompt, motion_val) in enumerate(zip(prompts, motion_values)):
+                    print(motion_val)
                     if not image_finetune:
                         sample = validation_pipeline(
                             prompt,
@@ -447,7 +471,7 @@ def main(
                             video_length = train_data.sample_n_frames,
                             height       = height,
                             width        = width,
-                            motion=motion
+                            motion       = motion_val,
                             **validation_data,
                         ).videos
                         save_videos_grid(sample, f"{output_dir}/samples/sample-{global_step}/{idx}.gif")

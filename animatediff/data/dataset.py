@@ -115,7 +115,7 @@ class WebVid10M(Dataset):
             
             return pixel_values, name
             
-    def read_motion_score(preprocessed_dir, videoid):
+    def read_motion_score(self,preprocessed_dir, videoid):
         score_file = os.path.join(preprocessed_dir, f"{videoid}.txt")
         if not os.path.exists(score_file):
             return None
@@ -138,29 +138,23 @@ class WebVid10M(Dataset):
                 idx = random.randint(0, len(self.dataset) - 1)
                 continue  # try the next index
 
-            motion_score = read_motion_score(self.motion_folder, videoid)
+            motion_score = self.read_motion_score(self.motion_folder, videoid)
             if motion_score is None:
                 idx = random.randint(0, len(self.dataset) - 1)
                 continue  # try the next index
     
-            if not self.is_image:
-                image_files = sorted(os.listdir(preprocessed_dir), key=sort_frames)
-                total_frames = len(image_files)
-                clip_length = min(total_frames, (self.sample_n_frames - 1) * self.sample_stride + 1)
-                start_idx = random.randint(0, total_frames - clip_length)
-                batch_index = np.linspace(start_idx, start_idx + clip_length - 1, self.sample_n_frames, dtype=int)
-            else:
-                image_files = random.choice(os.listdir(preprocessed_dir))
-                batch_index = [image_files]
-    
+            image_files = sorted(os.listdir(preprocessed_dir), key=sort_frames)
+            total_frames = len(image_files)
+            clip_length = min(total_frames, (self.sample_n_frames - 1) * self.sample_stride + 1)
+            start_idx = random.randint(0, total_frames - clip_length)
+            batch_index = np.linspace(start_idx, start_idx + clip_length - 1, self.sample_n_frames, dtype=int)
+
             # Read images from the directory
             pixel_values = torch.stack([read_image(os.path.join(preprocessed_dir, image_files[int(i)])) for i in batch_index])
             pixel_values = pixel_values.float() / 255.  # Convert from uint8 to float and normalize
-    
             if self.is_image:
                 pixel_values = pixel_values[0]
-    
-        return pixel_values, name, motion_score
+            return pixel_values, name, motion_score
         
         
     
@@ -176,8 +170,9 @@ class WebVid10M(Dataset):
                 print(e)
                 idx = random.randint(0, self.length - 1)
 
-    pixel_values = self.pixel_transforms(pixel_values)
-    sample = dict(pixel_values=pixel_values, text=name, motion_score=motion_score)
+        pixel_values = self.pixel_transforms(pixel_values)
+        sample = dict(pixel_values=pixel_values, text=name, motion_score=motion_score)
+        return sample
 
 
 

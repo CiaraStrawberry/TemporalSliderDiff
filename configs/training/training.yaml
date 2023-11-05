@@ -2,7 +2,7 @@ image_finetune: false
 
 output_dir: "outputs"
 pretrained_model_path: "/home/holo/AnimateDiff-512/models/StableDiffusionVae"
-pretrained_override_path: "/home/holo/TemporalImage-v2/models/StableDiffusion"
+pretrained_override_path: "/home/holo/TemporalImage-v2/models/StableDiffusion/unet/diffusion_pytorch_model.bin"
 
 unet_additional_kwargs:
   use_motion_module              : true
@@ -40,9 +40,9 @@ train_data:
 validation_data:
   prompts:
     - "Snow rocky mountains peaks canyon. Snow blanketed rocky mountains surround and shadow deep canyons."
+    - "Snow rocky mountains peaks canyon. Snow blanketed rocky mountains surround and shadow deep canyons."
     - "A drone view of celebration with Christma tree and fireworks, starry sky - background."
-    - "Robot dancing in times square."
-    - "Pacific coast, carmel by the sea ocean and waves."
+    - "A drone view of celebration with Christma tree and fireworks, starry sky - background."
   num_inference_steps: 25
   guidance_scale: 8.
 
@@ -51,19 +51,19 @@ trainable_modules:
 
 unet_checkpoint_path: "/home/holo/AnimateDiff-512/models/Motion_Module/mm_sd_v14.ckpt"
 
-learning_rate:    3.e-6
-train_batch_size: 18
+learning_rate:    2.e-6
+train_batch_size: 6
 
 max_train_epoch:      -1
-max_train_steps:      1000
+max_train_steps:      100000
 checkpointing_epochs: -1
-checkpointing_steps:  200
+checkpointing_steps:  2000
 
-validation_steps:       200
+validation_steps:       500
 validation_steps_tuple: [2, 50]
 
 global_seed: 42
 mixed_precision_training: true
-enable_xformers_memory_efficient_attention: False
+enable_xformers_memory_efficient_attention: True
 
 is_debug: False
