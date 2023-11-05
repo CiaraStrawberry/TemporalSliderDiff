@@ -1,7 +1,8 @@
 image_finetune: false
 
 output_dir: "outputs"
-pretrained_model_path: "/workspace/AnimateDiff-512/models/StableDiffusion"
+pretrained_model_path: "/home/holo/AnimateDiff-512/models/StableDiffusionVae"
+pretrained_override_path: "/home/holo/TemporalImage-v2/models/StableDiffusion"
 
 unet_additional_kwargs:
   use_motion_module              : true
@@ -13,7 +14,7 @@ unet_additional_kwargs:
   motion_module_kwargs:
     num_attention_heads                : 8
     num_transformer_block              : 1
-    attention_block_types              : [ "Temporal_Self", "Temporal_Self","Temporal_Cross" ]
+    attention_block_types              : [ "Temporal_Self", "Temporal_Cross","Temporal_Self" ]
 
     temporal_position_encoding         : true
     temporal_position_encoding_max_len : 24
@@ -48,9 +49,9 @@ validation_data:
 trainable_modules:
   - "motion_modules."
 
-unet_checkpoint_path: "/workspace/AnimateDiff-512/models/Motion_module/mm_sd_v14.ckpt"
+unet_checkpoint_path: "/home/holo/AnimateDiff-512/models/Motion_Module/mm_sd_v14.ckpt"
 
-learning_rate:    2.e-6
+learning_rate:    3.e-6
 train_batch_size: 18
 
 max_train_epoch:      -1

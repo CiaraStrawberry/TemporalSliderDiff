@@ -83,7 +83,7 @@ def main(
     
     output_dir: str,
     pretrained_model_path: str,
-
+    pretrained_override_path: str
     train_data: Dict,
     validation_data: Dict,
     cfg_random_null_text: bool = True,
@@ -437,8 +437,9 @@ def main(
                 width  = train_data.sample_size[1] if not isinstance(train_data.sample_size, int) else train_data.sample_size
 
                 prompts = validation_data.prompts[:2] if global_step < 1000 and (not image_finetune) else validation_data.prompts
+                motion_values = [5,5,80,80]
 
-                for idx, prompt in enumerate(prompts):
+                for idx, (prompt, motion) in enumerate(zip(prompts, motion_values)):
                     if not image_finetune:
                         sample = validation_pipeline(
                             prompt,
@@ -446,6 +447,7 @@ def main(
                             video_length = train_data.sample_n_frames,
                             height       = height,
                             width        = width,
+                            motion=motion
                             **validation_data,
                         ).videos
                         save_videos_grid(sample, f"{output_dir}/samples/sample-{global_step}/{idx}.gif")
