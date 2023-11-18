@@ -15,6 +15,7 @@ unet_additional_kwargs:
     num_transformer_block: 1
     attention_block_types:
     - Temporal_Self
+    - Temporal_Cross
     - Temporal_Self
     temporal_position_encoding: true
     temporal_position_encoding_max_len: 24
